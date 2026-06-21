@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --gold: #D4AF37;
+    --gold-light: #E8CC6A;
+    --gold-dark: #B8960C;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-surface-900 text-white antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-surface-800; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-600 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-surface-500; }
+}
+
+@layer components {
+  /* Card */
+  .card {
+    @apply bg-surface-800 border border-surface-700 rounded-2xl;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full bg-surface-700 border border-surface-600 rounded-xl px-4 py-3
+           text-white placeholder-surface-400 text-sm
+           focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold/50
+           transition-all duration-150;
+  }
+
+  .input-label {
+    @apply block text-xs font-medium text-surface-300 mb-1.5 uppercase tracking-wide;
+  }
+
+  /* Select */
+  select.input {
+    @apply appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A8A8A' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-medium
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-900
+           disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-gold text-black hover:bg-gold-light active:bg-gold-dark focus:ring-gold px-5 py-3 text-sm;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-700 text-white hover:bg-surface-600 active:bg-surface-500 focus:ring-surface-500 px-5 py-3 text-sm;
+  }
+
+  .btn-ghost {
+    @apply btn text-surface-300 hover:text-white hover:bg-surface-700 px-3 py-2 text-sm;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-500 focus:ring-red-500 px-5 py-3 text-sm;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ring-1;
+  }
+
+  /* Table */
+  .table-row {
+    @apply border-b border-surface-700 hover:bg-surface-700/40 transition-colors;
+  }
+
+  .table-th {
+    @apply text-left text-xs font-semibold text-surface-400 uppercase tracking-wider py-3 px-4;
+  }
+
+  .table-td {
+    @apply py-3 px-4 text-sm;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply card p-5 flex flex-col gap-3;
+  }
+
+  /* Gold gradient text */
+  .text-gold-gradient {
+    @apply bg-gradient-to-r from-gold to-gold-light bg-clip-text text-transparent;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .section-title {
+    @apply text-xl font-semibold text-white;
+  }
+}
