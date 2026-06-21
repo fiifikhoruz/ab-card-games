@@ -1,51 +1,42 @@
 'use client'
 
-import { useState } from 'react'
 import Sidebar from './Sidebar'
-import Header from './Header'
+import BottomNav from './BottomNav'
 
 interface AppLayoutProps {
   children: React.ReactNode
   title: string
   subtitle?: string
-  action?: { label: string; href: string }
 }
 
-export default function AppLayout({ children, title, subtitle, action }: AppLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
+export default function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex flex-shrink-0">
+    <div className="min-h-dvh bg-surface-900">
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 z-20">
         <Sidebar />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className="relative z-50 flex flex-col">
-            <Sidebar onClose={() => setSidebarOpen(false)} />
+      {/* Main area */}
+      <div className="lg:pl-60 flex flex-col min-h-dvh">
+        {/* Header */}
+        <header className="sticky top-0 z-10 bg-surface-900/95 backdrop-blur-md border-b border-surface-700 px-4 lg:px-6 h-14 flex items-center">
+          <div>
+            <h1 className="text-[17px] font-bold text-white leading-none">{title}</h1>
+            {subtitle && (
+              <p className="text-xs text-surface-500 mt-0.5">{subtitle}</p>
+            )}
           </div>
-        </div>
-      )}
+        </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header
-          title={title}
-          subtitle={subtitle}
-          onMenuClick={() => setSidebarOpen(true)}
-          action={action}
-        />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* Page content */}
+        <main className="flex-1 px-4 py-5 pb-24 lg:px-6 lg:pb-8">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom nav — hidden on desktop */}
+      <BottomNav />
     </div>
   )
 }

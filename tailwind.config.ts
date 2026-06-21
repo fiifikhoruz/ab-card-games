@@ -9,52 +9,46 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Brand
         gold: {
-          DEFAULT: '#D4AF37',
-          light: '#E8CC6A',
-          dark: '#B8960C',
-          50:  '#FBF7E4',
-          100: '#F5EBC0',
-          200: '#ECDA87',
-          300: '#E2C94E',
-          400: '#D4AF37',
-          500: '#B8960C',
-          600: '#8F740A',
-          700: '#6B5607',
-          800: '#483A05',
-          900: '#241D02',
+          DEFAULT: '#ffd700',
+          light:   '#ffe033',
+          dark:    '#e6c200',
         },
+        // Surface scale (values updated to new design system)
         surface: {
-          DEFAULT: '#0A0A0A',
-          50:  '#F7F7F7',
-          100: '#EFEFEF',
-          200: '#D9D9D9',
-          300: '#B8B8B8',
-          400: '#8A8A8A',
-          500: '#5C5C5C',
-          600: '#3D3D3D',
-          700: '#2A2A2A',
-          800: '#1A1A1A',
-          900: '#0A0A0A',
-        }
+          200: '#e0e0e0',
+          300: '#c0c0c0',
+          400: '#a0a0a0',
+          500: '#606060',
+          600: '#2c2c2c',
+          700: '#1c1c1c',
+          800: '#141414',
+          900: '#0a0a0a',
+        },
+        // Edition colors
+        edition: {
+          ghana:     '#ffd700',
+          global:    '#00bf63',
+          spicy:     '#ff3131',
+          complete:  '#e8e8e8',
+          christian: '#8c52ff',
+        },
+        // WhatsApp
+        wa: '#25D366',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
       },
       animation: {
-        'fade-in': 'fadeIn 0.2s ease-in-out',
-        'slide-up': 'slideUp 0.3s ease-out',
+        'fade-in':  'fadeIn 0.15s ease-out',
+        'slide-up': 'slideUp 0.2s ease-out',
+        'sheet-in': 'sheetIn 0.32s cubic-bezier(0.32,0.72,0,1)',
       },
       keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
+        fadeIn:  { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+        slideUp: { '0%': { transform: 'translateY(6px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+        sheetIn: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
       },
     },
   },

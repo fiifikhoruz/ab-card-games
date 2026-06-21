@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AppLayout from '@/components/layout/AppLayout'
-import { ChevronLeft, Check, Loader2, Plus, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import { ChevronLeft, ChevronRight, Check, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { formatCurrency, getShortName } from '@/lib/utils'
-import { PAYMENT_METHODS } from '@/lib/types'
+import { PAYMENT_METHODS, PRODUCT_COLORS, getEditionColor } from '@/lib/types'
 import type { PaymentMethod, Product } from '@/lib/types'
 import toast from 'react-hot-toast'
 
+// ── Types ─────────────────────────────────────────────────
 interface LineItem {
   productId: string
   quantity: string
@@ -25,19 +24,48 @@ function emptyLine(products: Product[]): LineItem {
   }
 }
 
+type Step = 'editions' | 'customer' | 'payment' | 'confirm'
+
+const STEPS: Step[] = ['editions', 'customer', 'payment', 'confirm']
+
+const STEP_LABEL: Record<Step, string> = {
+  editions: 'Editions',
+  customer: 'Customer',
+  payment:  'Payment',
+  confirm:  'Confirm',
+}
+
+// ── Edition name helper ───────────────────────────────────
+const EDITION_SHORT: Record<string, string> = {
+  'SSG-001': 'Ghana',
+  'SSG-002': 'Global',
+  'SSG-003': 'Spicy',
+  'SSG-004': 'Complete',
+  'SSG-005': 'Christian',
+}
+
+// ── Main page ─────────────────────────────────────────────
 export default function NewSalePage() {
   const router   = useRouter()
   const supabase = getSupabaseClient()
 
-  const [products, setProducts]               = useState<Product[]>([])
+  const [products, setProducts]           = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
-  const [customerName, setCustomerName]       = useState('')
-  const [customerPhone, setCustomerPhone]     = useState('')
-  const [saleDate, setSaleDate]               = useState(() => new Date().toISOString().slice(0, 10))
-  const [paymentMethod, setPaymentMethod]     = useState<PaymentMethod>('mobile_money')
-  const [amountPaid, setAmountPaid]           = useState('')
-  const [lines, setLines]                     = useState<LineItem[]>([])
-  const [saving, setSaving]                   = useState(false)
+  const [step, setStep]                   = useState<Step>('editions')
+
+  // Line items
+  const [lines, setLines] = useState<LineItem[]>([])
+
+  // Customer
+  const [customerName, setCustomerName]   = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [saleDate, setSaleDate]           = useState(() => new Date().toISOString().slice(0, 10))
+
+  // Payment
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mobile_money')
+  const [amountPaid, setAmountPaid]       = useState('')
+
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     supabase.from('products').select('*').order('sku').then(({ data }) => {
@@ -49,7 +77,7 @@ export default function NewSalePage() {
     })
   }, [])
 
-  // ── Line item helpers ──────────────────────────
+  // ── Line helpers ─────────────────────────────────────────
   function updateLine(index: number, field: keyof LineItem, value: string) {
     setLines(prev => {
       const next = [...prev]
@@ -62,40 +90,45 @@ export default function NewSalePage() {
     })
   }
 
-  function addLine() {
-    setLines(prev => [...prev, emptyLine(products)])
-  }
+  function addLine() { setLines(prev => [...prev, emptyLine(products)]) }
+  function removeLine(i: number) { setLines(prev => prev.filter((_, j) => j !== i)) }
 
-  function removeLine(index: number) {
-    setLines(prev => prev.filter((_, i) => i !== index))
-  }
-
-  // ── Totals ─────────────────────────────────────
-  const lineTotal = (line: LineItem) =>
-    (parseInt(line.quantity, 10) || 0) * (parseFloat(line.unitPrice) || 0)
-
+  const lineTotal  = (l: LineItem) => (parseInt(l.quantity, 10) || 0) * (parseFloat(l.unitPrice) || 0)
   const grandTotal = lines.reduce((sum, l) => sum + lineTotal(l), 0)
   const paid       = parseFloat(amountPaid) || 0
 
-  // ── Submit ─────────────────────────────────────
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  // ── Step navigation ──────────────────────────────────────
+  function currentStepIndex() { return STEPS.indexOf(step) }
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      if (!line.productId)                    { toast.error(`Item ${i + 1}: select an edition`); return }
-      if (!(parseInt(line.quantity, 10) > 0)) { toast.error(`Item ${i + 1}: enter a valid quantity`); return }
-      if (!(parseFloat(line.unitPrice) > 0))  { toast.error(`Item ${i + 1}: enter a valid price`); return }
+  function canGoNext(): boolean {
+    if (step === 'editions') {
+      return lines.every(l => l.productId && parseInt(l.quantity, 10) > 0 && parseFloat(l.unitPrice) > 0)
     }
+    if (step === 'payment') {
+      return true // amount paid optional (defaults to full)
+    }
+    return true
+  }
 
+  function goNext() {
+    const idx = currentStepIndex()
+    if (idx < STEPS.length - 1) setStep(STEPS[idx + 1])
+  }
+
+  function goBack() {
+    const idx = currentStepIndex()
+    if (idx > 0) setStep(STEPS[idx - 1])
+    else router.back()
+  }
+
+  // ── Submit ────────────────────────────────────────────────
+  async function handleSubmit() {
     setSaving(true)
     try {
-      // Upsert customer
       let customerId: string | null = null
       if (customerName.trim()) {
         const phone = customerPhone.trim() || null
         let existingId: string | null = null
-
         if (phone) {
           const { data } = await supabase.from('customers').select('id').eq('phone', phone).maybeSingle()
           existingId = data?.id ?? null
@@ -104,7 +137,6 @@ export default function NewSalePage() {
           const { data } = await supabase.from('customers').select('id').ilike('name', customerName.trim()).maybeSingle()
           existingId = data?.id ?? null
         }
-
         if (existingId) {
           customerId = existingId
         } else {
@@ -117,7 +149,6 @@ export default function NewSalePage() {
         }
       }
 
-      // One transaction_id shared across all line items
       const txnId      = crypto.randomUUID()
       const saleDateISO = new Date(saleDate + 'T12:00:00').toISOString()
       const rows = lines.map(line => {
@@ -126,7 +157,6 @@ export default function NewSalePage() {
         const price    = parseFloat(line.unitPrice)
         const lineTot  = qty * price
         const thisPaid = grandTotal > 0 ? (paid || grandTotal) * (lineTot / grandTotal) : lineTot
-
         return {
           transaction_id: txnId,
           customer_id:    customerId,
@@ -146,7 +176,7 @@ export default function NewSalePage() {
       if (error) throw error
 
       toast.success(`${rows.length > 1 ? `${rows.length} items` : 'Sale'} recorded!`)
-      router.push('/')
+      router.push('/sales')
     } catch (err: any) {
       toast.error(err?.message ?? 'Something went wrong')
     } finally {
@@ -154,38 +184,159 @@ export default function NewSalePage() {
     }
   }
 
+  // ── Render ────────────────────────────────────────────────
+  if (loadingProducts) {
+    return (
+      <div className="min-h-dvh bg-surface-900 flex items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-gold" />
+      </div>
+    )
+  }
+
+  const stepIdx  = currentStepIndex()
+  const progress = ((stepIdx + 1) / STEPS.length) * 100
+
   return (
-    <AppLayout title="New Sale">
-      <div className="max-w-lg mx-auto">
+    <div className="min-h-dvh bg-surface-900 flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-surface-900/95 backdrop-blur-md border-b border-surface-700 flex items-center px-4 h-14">
+        <button onClick={goBack} className="btn-ghost p-1.5 -ml-1.5 mr-2">
+          <ChevronLeft size={20} />
+        </button>
+        <div className="flex-1">
+          <h1 className="text-[17px] font-bold text-white">New sale</h1>
+        </div>
+        {/* Step indicator */}
+        <span className="text-xs text-surface-500">{stepIdx + 1} of {STEPS.length}</span>
+      </header>
 
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white mb-5">
-          <ChevronLeft size={16} /> Dashboard
-        </Link>
+      {/* Progress bar */}
+      <div className="h-0.5 bg-surface-700">
+        <div
+          className="h-full bg-gold transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
 
-        {loadingProducts ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 size={24} className="animate-spin text-gold" />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Step tabs */}
+      <div className="flex border-b border-surface-700 px-4">
+        {STEPS.map((s, i) => (
+          <button
+            key={s}
+            onClick={() => i < stepIdx && setStep(s)}
+            className={`flex-1 py-3 text-xs font-medium transition-colors ${
+              s === step
+                ? 'text-gold border-b-2 border-gold -mb-px'
+                : i < stepIdx
+                  ? 'text-surface-400 cursor-pointer hover:text-white'
+                  : 'text-surface-600 cursor-default'
+            }`}
+          >
+            {STEP_LABEL[s]}
+          </button>
+        ))}
+      </div>
 
-            {/* Customer */}
-            <div className="card p-4 space-y-3">
-              <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Customer</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="input-label">Name <span className="text-surface-500">(optional)</span></label>
-                  <input type="text" className="input" placeholder="Walk-in"
-                    value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                </div>
-                <div>
-                  <label className="input-label">Phone <span className="text-surface-500">(optional)</span></label>
-                  <input type="tel" className="input" placeholder="024 000 0000"
-                    value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="input-label">Sale Date</label>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 pb-32">
+        <div className="max-w-lg mx-auto space-y-4">
+
+          {/* ── Step: Editions ─────────────────────────── */}
+          {step === 'editions' && (
+            <>
+              {lines.map((line, i) => {
+                const product = products.find(p => p.id === line.productId)
+                const color   = product ? (PRODUCT_COLORS[product.sku] ?? '#a0a0a0') : '#a0a0a0'
+                const tot     = lineTotal(line)
+                return (
+                  <div key={i} className="card p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="text-xs font-semibold text-surface-400">
+                          {i === 0 ? 'Edition' : `Edition ${i + 1}`}
+                        </span>
+                      </div>
+                      {lines.length > 1 && (
+                        <button onClick={() => removeLine(i)} className="text-surface-500 hover:text-red-400 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Edition picker */}
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {products.map(p => {
+                        const c      = PRODUCT_COLORS[p.sku] ?? '#a0a0a0'
+                        const isSelv = line.productId === p.id
+                        const name   = EDITION_SHORT[p.sku] ?? getShortName(p.name)
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => updateLine(i, 'productId', p.id)}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                              isSelv
+                                ? 'border-transparent'
+                                : 'border-surface-700 hover:border-surface-600'
+                            }`}
+                            style={isSelv ? { borderColor: c, background: `${c}15` } : {}}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c }} />
+                            <span className={`text-xs font-medium ${isSelv ? 'text-white' : 'text-surface-400'}`}>{name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Qty + Price */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="input-label">Qty</label>
+                        <input
+                          type="number"
+                          className="input"
+                          min={1}
+                          value={line.quantity}
+                          onChange={e => updateLine(i, 'quantity', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="input-label">Price (GH₵)</label>
+                        <input
+                          type="number"
+                          className="input"
+                          min={0}
+                          step="0.01"
+                          value={line.unitPrice}
+                          onChange={e => updateLine(i, 'unitPrice', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {tot > 0 && (
+                      <div className="flex justify-end">
+                        <span className="text-xs text-surface-500">
+                          Subtotal: <span className="text-gold font-semibold">{formatCurrency(tot)}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Add edition */}
+              <button
+                type="button"
+                onClick={addLine}
+                className="w-full py-3 rounded-2xl border border-dashed border-surface-600 text-sm text-surface-400 hover:text-white hover:border-surface-500 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={14} /> Add another edition
+              </button>
+
+              {/* Sale date */}
+              <div className="card p-4">
+                <label className="input-label">Sale date</label>
                 <input
                   type="date"
                   className="input"
@@ -194,133 +345,183 @@ export default function NewSalePage() {
                   onChange={e => setSaleDate(e.target.value)}
                 />
               </div>
-            </div>
+            </>
+          )}
 
-            {/* Line Items */}
-            <div className="card p-4 space-y-3">
-              <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Editions</p>
-
-              {lines.map((line, i) => {
-                const tot = lineTotal(line)
-                return (
-                  <div key={i} className="space-y-2">
-                    {i > 0 && <div className="border-t border-surface-700 pt-3" />}
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-surface-500">Item {i + 1}</span>
-                      {lines.length > 1 && (
-                        <button type="button" onClick={() => removeLine(i)}
-                          className="text-surface-500 hover:text-red-400 transition-colors">
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    <select
-                      className="input"
-                      value={line.productId}
-                      onChange={e => updateLine(i, 'productId', e.target.value)}
-                      required
-                    >
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {getShortName(p.name)} — {formatCurrency(p.unit_price)} ({p.stock} in stock)
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="input-label">Quantity</label>
-                        <input type="number" className="input" min={1}
-                          value={line.quantity}
-                          onChange={e => updateLine(i, 'quantity', e.target.value)}
-                          required />
-                      </div>
-                      <div>
-                        <label className="input-label">Unit Price (GH₵)</label>
-                        <input type="number" className="input" min={0} step="0.01"
-                          value={line.unitPrice}
-                          onChange={e => updateLine(i, 'unitPrice', e.target.value)}
-                          required />
-                      </div>
-                    </div>
-
-                    {tot > 0 && (
-                      <div className="flex justify-end">
-                        <span className="text-xs text-surface-400">Subtotal: <span className="text-gold font-semibold">{formatCurrency(tot)}</span></span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              <button
-                type="button"
-                onClick={addLine}
-                className="w-full py-2.5 rounded-xl border border-dashed border-surface-600 text-sm text-surface-400 hover:text-white hover:border-surface-500 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus size={15} /> Add another edition
-              </button>
-            </div>
-
-            {/* Grand Total */}
-            {grandTotal > 0 && (
-              <div className="bg-surface-800 rounded-xl px-4 py-3 flex items-center justify-between">
-                <span className="text-sm text-surface-400">Total{lines.length > 1 ? ` (${lines.length} items)` : ''}</span>
-                <span className="text-lg font-bold text-gold">{formatCurrency(grandTotal)}</span>
-              </div>
-            )}
-
-            {/* Payment */}
-            <div className="card p-4 space-y-3">
-              <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Payment</p>
-
-              <div className="grid grid-cols-2 gap-2">
-                {PAYMENT_METHODS.map(m => (
-                  <button key={m.value} type="button" onClick={() => setPaymentMethod(m.value)}
-                    className={`py-2.5 px-3 rounded-xl text-sm font-medium border transition-all text-left ${
-                      paymentMethod === m.value
-                        ? 'bg-gold/15 border-gold/40 text-gold'
-                        : 'bg-surface-800 border-surface-700 text-surface-400 hover:text-white'
-                    }`}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-
+          {/* ── Step: Customer ─────────────────────────── */}
+          {step === 'customer' && (
+            <div className="card p-4 space-y-4">
+              <p className="text-sm font-semibold text-white">Customer details</p>
+              <p className="text-xs text-surface-500 -mt-2">Both fields are optional. Leave blank for a walk-in.</p>
               <div>
-                <label className="input-label">
-                  Amount Paid (GH₵)
+                <label className="input-label">Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Walk-in"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="input-label">Phone</label>
+                <input
+                  type="tel"
+                  className="input"
+                  placeholder="024 000 0000"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Step: Payment ─────────────────────────── */}
+          {step === 'payment' && (
+            <div className="space-y-4">
+              <div className="card p-4 space-y-3">
+                <p className="text-sm font-semibold text-white">Payment method</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAYMENT_METHODS.map(m => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.value)}
+                      className={`py-3 px-4 rounded-xl border text-sm font-medium transition-all text-left flex items-center gap-2 ${
+                        paymentMethod === m.value
+                          ? 'border-gold/40 bg-gold/10 text-gold'
+                          : 'border-surface-700 text-surface-400 hover:text-white hover:border-surface-600'
+                      }`}
+                    >
+                      <span>{m.icon}</span>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-white">Amount paid (GH₵)</p>
                   {grandTotal > 0 && (
-                    <button type="button" className="ml-2 text-xs text-gold underline"
-                      onClick={() => setAmountPaid(String(grandTotal))}>
+                    <button
+                      type="button"
+                      className="text-xs text-gold font-medium"
+                      onClick={() => setAmountPaid(String(grandTotal))}
+                    >
                       Full amount
                     </button>
                   )}
-                </label>
-                <input type="number" className="input" min={0} step="0.01"
-                  placeholder={grandTotal > 0 ? String(grandTotal) : '0.00'}
+                </div>
+                <input
+                  type="number"
+                  className="input"
+                  min={0}
+                  step="0.01"
+                  placeholder={grandTotal > 0 ? formatCurrency(grandTotal) : '0.00'}
                   value={amountPaid}
-                  onChange={e => setAmountPaid(e.target.value)} />
+                  onChange={e => setAmountPaid(e.target.value)}
+                />
                 {paid > 0 && paid < grandTotal && (
-                  <p className="text-xs text-amber-400 mt-1.5">
+                  <p className="text-xs text-amber-400">
                     Balance outstanding: {formatCurrency(grandTotal - paid)}
                   </p>
                 )}
               </div>
             </div>
+          )}
 
-            {/* Submit */}
-            <button type="submit" disabled={saving}
-              className="btn-primary w-full justify-center py-3.5 text-base">
-              {saving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-              {saving ? 'Saving…' : `Record Sale${lines.length > 1 ? ` (${lines.length} items)` : ''}`}
-            </button>
+          {/* ── Step: Confirm ──────────────────────────── */}
+          {step === 'confirm' && (
+            <div className="space-y-3">
+              {/* Items */}
+              <div className="card divide-y divide-surface-700 overflow-hidden">
+                {lines.map((line, i) => {
+                  const p = products.find(pr => pr.id === line.productId)
+                  const color = p ? (PRODUCT_COLORS[p.sku] ?? '#a0a0a0') : '#a0a0a0'
+                  const name  = p ? (EDITION_SHORT[p.sku] ?? getShortName(p.name)) : 'Unknown'
+                  const tot   = lineTotal(line)
+                  return (
+                    <div key={i} className="list-row">
+                      <div className="edition-dot" style={{ backgroundColor: color }} />
+                      <div className="flex-1">
+                        <p className="text-sm text-white font-medium">{name} Edition</p>
+                        <p className="text-xs text-surface-500">×{line.quantity} @ {formatCurrency(parseFloat(line.unitPrice))}</p>
+                      </div>
+                      <p className="text-sm font-bold text-gold">{formatCurrency(tot)}</p>
+                    </div>
+                  )
+                })}
+              </div>
 
-          </form>
-        )}
+              {/* Summary */}
+              <div className="card p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Total</span>
+                  <span className="font-bold text-gold">{formatCurrency(grandTotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Payment</span>
+                  <span className="text-white">
+                    {PAYMENT_METHODS.find(m => m.value === paymentMethod)?.icon} {PAYMENT_METHODS.find(m => m.value === paymentMethod)?.label}
+                  </span>
+                </div>
+                {amountPaid && (
+                  <div className="flex justify-between">
+                    <span className="text-surface-400">Paid</span>
+                    <span className={`font-semibold ${paid < grandTotal ? 'text-amber-400' : 'text-white'}`}>
+                      {formatCurrency(paid)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-surface-700 pt-2 mt-2">
+                  <span className="text-surface-400">Customer</span>
+                  <span className="text-white">{customerName.trim() || 'Walk-in'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Date</span>
+                  <span className="text-white">{saleDate}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
-    </AppLayout>
+
+      {/* Bottom action bar */}
+      <div
+        className="fixed bottom-0 inset-x-0 bg-surface-900/95 backdrop-blur-md border-t border-surface-700 px-4 py-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="max-w-lg mx-auto">
+          {step !== 'confirm' ? (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canGoNext()}
+              className="btn-primary w-full justify-between py-3.5"
+            >
+              <span>{STEP_LABEL[STEPS[stepIdx + 1]] ?? 'Next'}</span>
+              {grandTotal > 0 && step === 'editions' && (
+                <span className="font-bold">{formatCurrency(grandTotal)}</span>
+              )}
+              <ChevronRight size={18} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saving}
+              className="btn-primary w-full justify-center py-3.5"
+            >
+              {saving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              {saving ? 'Saving…' : `Record sale${lines.length > 1 ? ` (${lines.length} items)` : ''}`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

@@ -3,22 +3,16 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import Link from 'next/link'
-import { Plus, Package, AlertTriangle, ShoppingCart, Loader2 } from 'lucide-react'
+import { Plus, AlertTriangle, ShoppingCart, Loader2, TrendingUp } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { formatCurrency, getShortName } from '@/lib/utils'
-import { PRODUCT_COLORS } from '@/lib/types'
+import { PRODUCT_COLORS, getEditionColor } from '@/lib/types'
 import type { Product, Sale } from '@/lib/types'
 
 function stockStatus(p: Product): 'ok' | 'low' | 'out' {
   if (p.stock === 0) return 'out'
   if (p.stock <= p.reorder_level) return 'low'
   return 'ok'
-}
-
-const STATUS_STYLES = {
-  ok:  { dot: 'bg-emerald-400', text: 'text-emerald-400', label: 'In Stock'     },
-  low: { dot: 'bg-amber-400',   text: 'text-amber-400',   label: 'Low Stock'    },
-  out: { dot: 'bg-red-400',     text: 'text-red-400',     label: 'Out of Stock' },
 }
 
 export default function DashboardPage() {
@@ -40,9 +34,9 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  const today      = new Date().toDateString()
-  const thisMonth  = new Date().getMonth()
-  const thisYear   = new Date().getFullYear()
+  const today     = new Date().toDateString()
+  const thisMonth = new Date().getMonth()
+  const thisYear  = new Date().getFullYear()
 
   const salesToday = sales.filter(s => new Date(s.sale_date).toDateString() === today)
   const salesMonth = sales.filter(s => {
@@ -70,59 +64,87 @@ export default function DashboardPage() {
     )
   }
 
+  const today_label = new Date().toLocaleDateString('en-GH', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+
   return (
-    <AppLayout
-      title="Dashboard"
-      subtitle={new Date().toLocaleDateString('en-GH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-    >
-      <div className="space-y-5">
+    <AppLayout title="Dashboard" subtitle={today_label}>
+      <div className="space-y-5 max-w-xl mx-auto lg:max-w-none">
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/sales/new" className="btn-primary py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold">
-            <Plus size={18} /> New Sale
-          </Link>
-          <Link href="/sales?tab=stock" className="btn-secondary py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold">
-            <Package size={18} /> Add Stock
-          </Link>
-        </div>
-
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="card p-4">
-            <p className="text-xs text-surface-400 mb-1">Today's Revenue</p>
-            <p className="text-xl font-bold text-gold">{formatCurrency(revenueToday)}</p>
-            <p className="text-xs text-surface-500 mt-0.5">{salesToday.length} sale{salesToday.length !== 1 ? 's' : ''}</p>
+        {/* Revenue strip */}
+        <div className="metric-strip">
+          <div className="metric-cell">
+            <span className="metric-value text-gold">{formatCurrency(revenueToday)}</span>
+            <span className="metric-label">Today</span>
           </div>
-          <div className="card p-4">
-            <p className="text-xs text-surface-400 mb-1">This Month</p>
-            <p className="text-xl font-bold text-white">{formatCurrency(revenueMonth)}</p>
-            <p className="text-xs text-surface-500 mt-0.5">{salesMonth.length} sale{salesMonth.length !== 1 ? 's' : ''}</p>
+          <div className="metric-cell">
+            <span className="metric-value">{formatCurrency(revenueMonth)}</span>
+            <span className="metric-label">This month</span>
+          </div>
+          <div className="metric-cell">
+            <span className="metric-value">{salesToday.length}</span>
+            <span className="metric-label">Sales today</span>
+          </div>
+          <div className="metric-cell">
+            <span className="metric-value">{salesMonth.length}</span>
+            <span className="metric-label">This month</span>
           </div>
         </div>
 
-        {/* Product Inventory Cards */}
+        {/* Low stock alert */}
+        {lowStock.length > 0 && (
+          <div className="bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={14} className="text-amber-400 flex-shrink-0" />
+              <span className="text-sm font-semibold text-amber-300">
+                {lowStock.length} edition{lowStock.length > 1 ? 's' : ''} need restocking
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {lowStock.map(p => {
+                const color = PRODUCT_COLORS[p.sku] ?? '#a0a0a0'
+                return (
+                  <div key={p.id} className="flex items-center gap-2">
+                    <span className="edition-dot" style={{ backgroundColor: color }} />
+                    <span className="text-xs text-surface-300 flex-1">{getShortName(p.name)}</span>
+                    <span className={`text-xs font-bold ${p.stock === 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                      {p.stock === 0 ? 'Out' : `${p.stock} left`}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <Link href="/inventory" className="mt-3 text-xs text-gold font-medium flex items-center gap-1">
+              Manage stock →
+            </Link>
+          </div>
+        )}
+
+        {/* Edition stock */}
         <div>
-          <h2 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Stock Levels</h2>
-          <div className="space-y-2">
+          <p className="section-label">Stock levels</p>
+          <div className="card divide-y divide-surface-700 overflow-hidden">
             {products.map(p => {
               const status = stockStatus(p)
-              const style  = STATUS_STYLES[status]
+              const color  = PRODUCT_COLORS[p.sku] ?? '#a0a0a0'
               const sold   = unitsSoldMap[p.id] ?? 0
-              const color  = PRODUCT_COLORS[p.sku] ?? '#D4AF37'
               return (
-                <div key={p.id} className="card p-4 flex items-center gap-4">
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <div key={p.id} className="list-row">
+                  <span className="edition-dot" style={{ backgroundColor: color }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{getShortName(p.name)}</p>
-                    <p className={`text-xs mt-0.5 flex items-center gap-1.5 ${style.text}`}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                      {style.label}
-                    </p>
+                    <p className="text-sm font-medium text-white">{getShortName(p.name)}</p>
+                    <p className="text-xs text-surface-500">{sold} sold · {formatCurrency(p.unit_price)}</p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-white">{p.stock.toLocaleString()} units</p>
-                    <p className="text-xs text-surface-400 mt-0.5">{sold} sold</p>
+                  <div className="text-right">
+                    <p className={`text-sm font-bold ${
+                      status === 'out' ? 'text-red-400' :
+                      status === 'low' ? 'text-amber-400' :
+                      'text-white'
+                    }`}>
+                      {p.stock}
+                    </p>
+                    <p className="text-[10px] text-surface-500">units</p>
                   </div>
                 </div>
               )
@@ -130,63 +152,48 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Low Stock Alert */}
-        {lowStock.length > 0 && (
-          <div className="card border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={15} className="text-amber-400" />
-              <h2 className="text-sm font-semibold text-amber-300">
-                {lowStock.length} product{lowStock.length > 1 ? 's' : ''} need restocking
-              </h2>
-            </div>
-            <div className="space-y-1.5">
-              {lowStock.map(p => (
-                <div key={p.id} className="flex items-center justify-between">
-                  <span className="text-xs text-surface-300">{getShortName(p.name)}</span>
-                  <span className={`text-xs font-semibold ${p.stock === 0 ? 'text-red-400' : 'text-amber-400'}`}>
-                    {p.stock === 0 ? 'OUT' : `${p.stock} left`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent Sales */}
+        {/* Recent sales */}
         {sales.length > 0 ? (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Recent Sales</h2>
-              <Link href="/sales" className="text-xs text-gold">View all →</Link>
+              <p className="section-label mb-0">Recent sales</p>
+              <Link href="/sales" className="text-xs text-gold">See all →</Link>
             </div>
-            <div className="space-y-2">
-              {sales.slice(0, 5).map(sale => (
-                <div key={sale.id} className="card p-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-surface-700 flex items-center justify-center text-xs font-bold text-surface-300 flex-shrink-0">
-                    {sale.customer_name[0].toUpperCase()}
+            <div className="card divide-y divide-surface-700 overflow-hidden">
+              {sales.slice(0, 6).map(sale => {
+                const editionColor = getEditionColor(sale.product_name)
+                return (
+                  <div key={sale.id} className="list-row">
+                    <span className="edition-dot" style={{ backgroundColor: editionColor }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{sale.customer_name}</p>
+                      <p className="text-xs text-surface-500">{getShortName(sale.product_name)} · ×{sale.quantity}</p>
+                    </div>
+                    <p className="text-sm font-bold text-gold">{formatCurrency(sale.unit_price * sale.quantity)}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{sale.customer_name}</p>
-                    <p className="text-xs text-surface-400">{sale.product_name} · ×{sale.quantity}</p>
-                  </div>
-                  <p className="text-sm font-semibold text-gold flex-shrink-0">
-                    {formatCurrency(sale.unit_price * sale.quantity)}
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : (
-          <div className="card p-8 text-center">
-            <ShoppingCart size={28} className="text-surface-600 mx-auto mb-3" />
-            <p className="text-surface-400 text-sm">No sales yet.</p>
-            <Link href="/sales/new" className="btn-primary mt-4 inline-flex items-center gap-2 py-2.5 px-5 text-sm">
-              <Plus size={16} /> Record First Sale
+          <div className="empty-state">
+            <div className="w-14 h-14 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
+              <ShoppingCart size={24} className="text-surface-500" />
+            </div>
+            <p className="text-white font-semibold mb-1">No sales yet</p>
+            <p className="text-sm text-surface-500 mb-5">Record your first sale to see stats here.</p>
+            <Link href="/sales/new" className="btn-primary text-sm px-6">
+              <Plus size={16} /> New sale
             </Link>
           </div>
         )}
 
       </div>
+
+      {/* FAB */}
+      <Link href="/sales/new" className="fab">
+        <Plus size={18} strokeWidth={2.5} /> New sale
+      </Link>
     </AppLayout>
   )
 }
