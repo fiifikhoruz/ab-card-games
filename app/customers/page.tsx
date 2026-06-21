@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { Search, Users, X, Loader2 } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
-import { formatCurrency, formatDate, getShortName } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { getEditionColor } from '@/lib/types'
+import EditionBadge from '@/components/EditionBadge'
 import type { Customer, Sale } from '@/lib/types'
 
 const PAYMENT_ICONS: Record<string, string> = {
@@ -190,12 +191,12 @@ export default function CustomersPage() {
                     const payIcon = PAYMENT_ICONS[s.payment_method] ?? '💳'
                     return (
                       <div key={s.id} className="list-row">
-                        <div className="edition-dot" style={{ backgroundColor: editionColor }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white">{getShortName(s.product_name)}</p>
-                          <p className="text-xs text-surface-500">
-                            ×{s.quantity} · {payIcon} · {formatDate(s.sale_date)}
-                          </p>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <EditionBadge productName={s.product_name} size="sm" />
+                            <span className="text-xs text-surface-500">×{s.quantity} · {payIcon}</span>
+                          </div>
+                          <p className="text-xs text-surface-500">{formatDate(s.sale_date)}</p>
                         </div>
                         <p className="text-sm font-bold text-gold">{formatCurrency(s.unit_price * s.quantity)}</p>
                       </div>

@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import Image from 'next/image'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 
@@ -20,7 +22,18 @@ export default function AppLayout({ children, title, subtitle }: AppLayoutProps)
       {/* Main area */}
       <div className="lg:pl-60 flex flex-col min-h-dvh">
         {/* Header */}
-        <header className="sticky top-0 z-10 bg-surface-900/95 backdrop-blur-md border-b border-surface-700 px-4 lg:px-6 h-14 flex items-center">
+        <header className="sticky top-0 z-10 bg-surface-900/95 backdrop-blur-md border-b border-surface-700 px-4 lg:px-6 h-14 flex items-center gap-3">
+          {/* Logo — mobile only (desktop shows in sidebar) */}
+          <Link href="/" className="lg:hidden flex-shrink-0">
+            <Image
+              src="/logo.png"
+              alt="AB Card Games"
+              width={36}
+              height={36}
+              className="w-9 h-9 object-contain"
+              priority
+            />
+          </Link>
           <div>
             <h1 className="text-[17px] font-bold text-white leading-none">{title}</h1>
             {subtitle && (

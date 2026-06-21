@@ -2,26 +2,17 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
+import EditionBadge from '@/components/EditionBadge'
 import Link from 'next/link'
-import { Plus, Search, ShoppingCart, Loader2, ChevronDown } from 'lucide-react'
+import { Plus, Search, ShoppingCart, Loader2 } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
-import { formatCurrency, formatDate, getShortName } from '@/lib/utils'
-import { getEditionColor, PAYMENT_METHODS } from '@/lib/types'
-import type { Sale } from '@/lib/types'
-
-// ── Payment icon helper ─────────────────────────────────
-const PAYMENT_ICONS: Record<string, string> = {
-  mobile_money:  '📱',
-  cash:          '💵',
-  bank_transfer: '🏦',
-  card_pos:      '💳',
-}
+import { formatCurrency, formatDate } from '@/lib/utils'
+import type { Sale, Product } from '@/lib/types'
 
 // ── Transaction grouping ────────────────────────────────
 interface Transaction {
   id: string
   customer_name: string
-  customer_phone?: string
   payment_method: Sale['payment_method']
   sale_date: string
   items: { product_name: string; quantity: number; unit_price: number }[]
@@ -42,7 +33,6 @@ function groupIntoTransactions(sales: Sale[]): Transaction[] {
       map.set(key, {
         id:             key,
         customer_name:  s.customer_name,
-        customer_phone: s.customer_phone,
         payment_method: s.payment_method,
         sale_date:      s.sale_date,
         items:          [{ product_name: s.product_name, quantity: s.quantity, unit_price: s.unit_price }],
@@ -54,28 +44,78 @@ function groupIntoTransactions(sales: Sale[]): Transaction[] {
   return Array.from(map.values())
 }
 
-// ── Main content ────────────────────────────────────────
+const PAYMENT_ICON: Record<string, string> = {
+  mobile_money: '📱', cash: '💵', bank_transfer: '🏦', card_pos: '💳',
+}
+
+// ── Sale card ─────────────────────────────────────────────
+function SaleCard({ txn }: { txn: Transaction }) {
+  const totalUnits = txn.items.reduce((s, i) => s + i.quantity, 0)
+  const hasBalance = txn.amount_paid < txn.total
+  const payIcon    = PAYMENT_ICON[txn.payment_method] ?? '💳'
+
+  // Deduplicate editions (a multi-qty single edition shows badge once)
+  const uniqueProducts = txn.items.filter(
+    (item, idx, arr) => arr.findIndex(i => i.product_name === item.product_name) === idx
+  )
+
+  return (
+    <div className="card p-4 space-y-3">
+      {/* Row 1: name + amount */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[15px] font-bold text-white leading-snug">{txn.customer_name}</p>
+        <div className="text-right flex-shrink-0">
+          <p className="text-[15px] font-bold text-gold">{formatCurrency(txn.total)}</p>
+          {hasBalance && (
+            <p className="text-[10px] text-amber-400 mt-0.5">Paid {formatCurrency(txn.amount_paid)}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Row 2: edition badges */}
+      <div className="flex flex-wrap gap-1.5">
+        {uniqueProducts.map((item, i) => (
+          <EditionBadge key={i} productName={item.product_name} />
+        ))}
+      </div>
+
+      {/* Row 3: units · payment · date */}
+      <div className="flex items-center justify-between pt-1 border-t border-surface-700">
+        <span className="text-xs text-surface-500">
+          {totalUnits} unit{totalUnits !== 1 ? 's' : ''}
+          {txn.items.length > 1 ? ` · ${txn.items.length} editions` : ''}
+        </span>
+        <span className="text-xs text-surface-500">
+          {payIcon} {formatDate(txn.sale_date)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Main ─────────────────────────────────────────────────
 function SalesContent() {
   const supabase = getSupabaseClient()
 
   const [sales, setSales]       = useState<Sale[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
-  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('sales')
-      .select('*')
-      .order('sale_date', { ascending: false })
-      .then(({ data }) => {
-        if (data) setSales(data)
-        setLoading(false)
-      })
+    async function load() {
+      const [{ data: saleRows }, { data: prods }] = await Promise.all([
+        supabase.from('sales').select('*').order('sale_date', { ascending: false }),
+        supabase.from('products').select('*').order('sku'),
+      ])
+      if (saleRows) setSales(saleRows)
+      if (prods)    setProducts(prods)
+      setLoading(false)
+    }
+    load()
   }, [])
 
   const transactions = groupIntoTransactions(sales)
-
   const filtered = transactions.filter(t =>
     !search ||
     t.customer_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -85,7 +125,9 @@ function SalesContent() {
   // Metrics
   const totalRevenue = filtered.reduce((sum, t) => sum + t.total, 0)
   const totalUnits   = filtered.reduce((sum, t) => t.items.reduce((s, i) => s + i.quantity, sum), 0)
-  const avgOrder     = filtered.length > 0 ? totalRevenue / filtered.length : 0
+  const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= p.reorder_level).length
+  const outStockCount = products.filter(p => p.stock <= 0).length
+  const alertCount    = lowStockCount + outStockCount
 
   if (loading) {
     return (
@@ -99,9 +141,14 @@ function SalesContent() {
 
   return (
     <AppLayout title="Sales">
-      <div className="space-y-4 max-w-xl mx-auto lg:max-w-none">
+      <div className="space-y-4 max-w-2xl mx-auto lg:max-w-none">
 
-        {/* Slim metric strip */}
+        {/* Primary action — top of page */}
+        <Link href="/sales/new" className="btn-primary w-full justify-center py-3.5 text-base">
+          <Plus size={18} strokeWidth={2.5} /> New sale
+        </Link>
+
+        {/* Metric strip */}
         <div className="metric-strip">
           <div className="metric-cell">
             <span className="metric-value text-gold">{formatCurrency(totalRevenue)}</span>
@@ -113,11 +160,13 @@ function SalesContent() {
           </div>
           <div className="metric-cell">
             <span className="metric-value">{totalUnits}</span>
-            <span className="metric-label">Units</span>
+            <span className="metric-label">Units sold</span>
           </div>
           <div className="metric-cell">
-            <span className="metric-value">{formatCurrency(avgOrder)}</span>
-            <span className="metric-label">Avg order</span>
+            <span className={`metric-value ${alertCount > 0 ? 'text-amber-400' : 'text-white'}`}>
+              {alertCount}
+            </span>
+            <span className="metric-label">Low stock</span>
           </div>
         </div>
 
@@ -133,78 +182,10 @@ function SalesContent() {
           />
         </div>
 
-        {/* Sale rows */}
+        {/* Transaction list */}
         {filtered.length > 0 ? (
-          <div className="card divide-y divide-surface-700 overflow-hidden">
-            {filtered.map(txn => {
-              const isExpanded = expanded === txn.id
-              const multiItem  = txn.items.length > 1
-              const hasBalance = txn.amount_paid < txn.total
-              // Color dot: first item's edition color
-              const dotColor = getEditionColor(txn.items[0].product_name)
-              const payIcon  = PAYMENT_ICONS[txn.payment_method] ?? '💳'
-
-              return (
-                <div key={txn.id}>
-                  <button
-                    className="w-full list-row text-left"
-                    onClick={() => multiItem && setExpanded(isExpanded ? null : txn.id)}
-                  >
-                    {/* Edition dot */}
-                    <span className="edition-dot" style={{ backgroundColor: dotColor }} />
-
-                    {/* Main info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{txn.customer_name}</p>
-                      <p className="text-xs text-surface-500 mt-0.5">
-                        {multiItem
-                          ? `${txn.items.map(i => getShortName(i.product_name)).join(', ')}`
-                          : `${getShortName(txn.items[0].product_name)} · ×${txn.items[0].quantity}`
-                        }
-                      </p>
-                    </div>
-
-                    {/* Right side */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gold">{formatCurrency(txn.total)}</p>
-                        <div className="flex items-center justify-end gap-1 mt-0.5">
-                          <span className="text-[11px]">{payIcon}</span>
-                          <span className="text-[10px] text-surface-500">{formatDate(txn.sale_date)}</span>
-                        </div>
-                      </div>
-                      {multiItem && (
-                        <ChevronDown
-                          size={14}
-                          className={`text-surface-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        />
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Expanded line items */}
-                  {multiItem && isExpanded && (
-                    <div className="bg-surface-700/30 px-4 py-3 space-y-2 border-t border-surface-700">
-                      {txn.items.map((item, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <span
-                            className="edition-dot w-2 h-2"
-                            style={{ backgroundColor: getEditionColor(item.product_name) }}
-                          />
-                          <span className="flex-1 text-surface-300 text-xs">{getShortName(item.product_name)} × {item.quantity}</span>
-                          <span className="text-white text-xs font-medium">{formatCurrency(item.unit_price * item.quantity)}</span>
-                        </div>
-                      ))}
-                      {hasBalance && (
-                        <p className="text-xs text-amber-400 pt-1">
-                          Paid {formatCurrency(txn.amount_paid)} · Balance {formatCurrency(txn.total - txn.amount_paid)}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div className="space-y-3">
+            {filtered.map(txn => <SaleCard key={txn.id} txn={txn} />)}
           </div>
         ) : (
           <div className="empty-state">
@@ -225,11 +206,6 @@ function SalesContent() {
           </div>
         )}
       </div>
-
-      {/* FAB */}
-      <Link href="/sales/new" className="fab">
-        <Plus size={18} strokeWidth={2.5} /> New sale
-      </Link>
     </AppLayout>
   )
 }

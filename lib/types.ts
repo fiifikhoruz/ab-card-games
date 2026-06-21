@@ -68,11 +68,23 @@ export const PRODUCT_COLORS: Record<string, string> = {
 
 // Helper: get edition color by product name substring
 export function getEditionColor(productName: string): string {
+  return getEditionInfo(productName).color
+}
+
+// Full edition info for badges and cards
+export interface EditionInfo {
+  name:      string
+  color:     string  // background / accent
+  textColor: string  // label text on that background
+  sku:       string
+}
+
+export function getEditionInfo(productName: string): EditionInfo {
   const n = productName.toLowerCase()
-  if (n.includes('ghana'))     return '#ffd700'
-  if (n.includes('global'))    return '#00bf63'
-  if (n.includes('spicy'))     return '#ff3131'
-  if (n.includes('complete'))  return '#e8e8e8'
-  if (n.includes('christian')) return '#8c52ff'
-  return '#a0a0a0'
+  if (n.includes('ghana'))     return { name: 'Ghana',     color: '#ffd700', textColor: '#000000', sku: 'SSG-001' }
+  if (n.includes('global'))    return { name: 'Global',    color: '#00bf63', textColor: '#ffffff', sku: 'SSG-002' }
+  if (n.includes('spicy'))     return { name: 'Spicy',     color: '#ff3131', textColor: '#ffffff', sku: 'SSG-003' }
+  if (n.includes('complete'))  return { name: 'Complete',  color: '#e8e8e8', textColor: '#000000', sku: 'SSG-004' }
+  if (n.includes('christian')) return { name: 'Christian', color: '#8c52ff', textColor: '#ffffff', sku: 'SSG-005' }
+  return { name: productName,  color: '#a0a0a0', textColor: '#ffffff', sku: '' }
 }

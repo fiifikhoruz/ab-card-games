@@ -102,7 +102,14 @@ export default function NewSalePage() {
 
   function canGoNext(): boolean {
     if (step === 'editions') {
-      return lines.every(l => l.productId && parseInt(l.quantity, 10) > 0 && parseFloat(l.unitPrice) > 0)
+      if (!lines.every(l => l.productId && parseInt(l.quantity, 10) > 0 && parseFloat(l.unitPrice) > 0)) return false
+      // Stock check
+      for (const line of lines) {
+        const p = products.find(pr => pr.id === line.productId)
+        if (!p) return false
+        if (Math.max(0, p.stock) < parseInt(line.quantity, 10)) return false
+      }
+      return true
     }
     if (step === 'payment') {
       return true // amount paid optional (defaults to full)
@@ -300,6 +307,18 @@ export default function NewSalePage() {
                           value={line.quantity}
                           onChange={e => updateLine(i, 'quantity', e.target.value)}
                         />
+                        {(() => {
+                          const p = products.find(pr => pr.id === line.productId)
+                          const qty = parseInt(line.quantity, 10)
+                          const avail = p ? Math.max(0, p.stock) : 0
+                          if (p && qty > avail) return (
+                            <p className="text-xs text-red-400 mt-1">{avail} in stock</p>
+                          )
+                          if (p) return (
+                            <p className="text-xs text-surface-500 mt-1">{avail} available</p>
+                          )
+                          return null
+                        })()}
                       </div>
                       <div>
                         <label className="input-label">Price (GH₵)</label>

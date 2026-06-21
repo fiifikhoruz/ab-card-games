@@ -2,13 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ShoppingCart, Package, Users } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   { href: '/',          label: 'Dashboard', icon: LayoutDashboard },
   { href: '/sales',     label: 'Sales',     icon: ShoppingCart    },
-  { href: '/inventory', label: 'Inventory', icon: Package         },
   { href: '/customers', label: 'Customers', icon: Users           },
 ]
 
