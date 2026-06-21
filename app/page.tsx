@@ -86,20 +86,16 @@ export default function DashboardPage() {
   }, [])
 
   // ── KPI calculations ──────────────────────────────────
-  const today     = new Date().toDateString()
   const thisMonth = new Date().getMonth()
   const thisYear  = new Date().getFullYear()
 
-  const salesToday = sales.filter(s => new Date(s.sale_date).toDateString() === today)
   const salesMonth = sales.filter(s => {
     const d = new Date(s.sale_date)
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear
   })
 
-  const revenueToday  = salesToday.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
-  const revenueMonth  = salesMonth.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
-  const unitsThisMonth = salesMonth.reduce((sum, s) => sum + s.quantity, 0)
-  const totalStock    = products.reduce((sum, p) => sum + Math.max(0, p.stock), 0)
+  const revenueAllTime = sales.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
+  const revenueMonth   = salesMonth.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
 
   // units sold per product
   const unitsSoldMap: Record<string, number> = {}
@@ -156,27 +152,16 @@ export default function DashboardPage() {
     <AppLayout title="Dashboard" subtitle={today_label}>
       <div className="space-y-6 max-w-2xl mx-auto lg:max-w-none">
 
-        {/* ── KPI grid ────────────────────────────────── */}
+        {/* ── KPI — two numbers, nothing else ─────────── */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="card p-4">
-            <p className="text-xs text-surface-500 mb-1">Revenue today</p>
-            <p className="text-2xl font-bold text-gold tabular-nums">{formatCurrency(revenueToday)}</p>
-            <p className="text-xs text-surface-500 mt-1">{salesToday.length} sale{salesToday.length !== 1 ? 's' : ''}</p>
+          <div className="card p-5">
+            <p className="text-xs text-surface-500 mb-2">All-time revenue</p>
+            <p className="text-2xl font-bold text-gold tabular-nums leading-none">{formatCurrency(revenueAllTime)}</p>
           </div>
-          <div className="card p-4">
-            <p className="text-xs text-surface-500 mb-1">Revenue this month</p>
-            <p className="text-2xl font-bold text-white tabular-nums">{formatCurrency(revenueMonth)}</p>
-            <p className="text-xs text-surface-500 mt-1">{salesMonth.length} sale{salesMonth.length !== 1 ? 's' : ''}</p>
-          </div>
-          <div className="card p-4">
-            <p className="text-xs text-surface-500 mb-1">Units sold this month</p>
-            <p className="text-2xl font-bold text-white tabular-nums">{unitsThisMonth}</p>
-            <p className="text-xs text-surface-500 mt-1">across all editions</p>
-          </div>
-          <div className="card p-4">
-            <p className="text-xs text-surface-500 mb-1">Total stock remaining</p>
-            <p className="text-2xl font-bold text-white tabular-nums">{totalStock.toLocaleString()}</p>
-            <p className="text-xs text-surface-500 mt-1">units in hand</p>
+          <div className="card p-5">
+            <p className="text-xs text-surface-500 mb-2">This month</p>
+            <p className="text-2xl font-bold text-white tabular-nums leading-none">{formatCurrency(revenueMonth)}</p>
+            <p className="text-xs text-surface-500 mt-2">{salesMonth.length} sale{salesMonth.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
 
