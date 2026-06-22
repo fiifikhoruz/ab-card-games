@@ -102,14 +102,8 @@ export default function NewSalePage() {
 
   function canGoNext(): boolean {
     if (step === 'editions') {
-      if (!lines.every(l => l.productId && parseInt(l.quantity, 10) > 0 && parseFloat(l.unitPrice) > 0)) return false
-      // Stock check
-      for (const line of lines) {
-        const p = products.find(pr => pr.id === line.productId)
-        if (!p) return false
-        if (Math.max(0, p.stock) < parseInt(line.quantity, 10)) return false
-      }
-      return true
+      // Only require valid product, qty > 0, price > 0 — stock warning is informational only
+      return lines.every(l => l.productId && parseInt(l.quantity, 10) > 0 && parseFloat(l.unitPrice) > 0)
     }
     if (step === 'payment') {
       return true // amount paid optional (defaults to full)
