@@ -6,57 +6,108 @@ import Link from 'next/link'
 import { Plus, X, Loader2 } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { formatCurrency, getShortName } from '@/lib/utils'
-import { PRODUCT_COLORS, getEditionInfo } from '@/lib/types'
+import { getEditionInfo } from '@/lib/types'
 import type { Product, Sale } from '@/lib/types'
 import toast from 'react-hot-toast'
 
-// ── Stock card ────────────────────────────────────────────
-interface StockCardProps {
+// ── Edition sales chart (stepping blocks) ─────────────────
+interface RankedEdition {
   product: Product
-  unitsSold: number
-  onClick: () => void
+  sold: number
+  info: ReturnType<typeof getEditionInfo>
 }
 
-function StockCard({ product, unitsSold, onClick }: StockCardProps) {
-  const info      = getEditionInfo(product.name)
-  const remaining = Math.max(0, product.stock)
-  const isOut     = product.stock <= 0
-  const isLow     = !isOut && product.stock <= product.reorder_level
+function EditionChart({ ranked }: { ranked: RankedEdition[] }) {
+  const maxSold  = Math.max(...ranked.map(r => r.sold), 1)
+  const hasSales = ranked.some(r => r.sold > 0)
+  const MEDALS   = ['🥇', '🥈', '🥉']
 
   return (
-    <button
-      onClick={onClick}
-      className="card p-4 text-left w-full active:scale-[0.98] transition-transform group"
-    >
-      {/* Top accent bar */}
-      <div className="h-1 -mx-4 -mt-4 mb-4 rounded-t-2xl" style={{ backgroundColor: info.color }} />
+    <div className="card p-5">
+      <p className="text-xs font-semibold text-surface-500 uppercase tracking-widest mb-5">
+        Editions moving most
+      </p>
 
-      {/* Edition name */}
-      <p className="text-xs font-semibold text-surface-400 mb-2">{info.name} Edition</p>
+      {hasSales ? (
+        <>
+          {/* Stepping blocks chart */}
+          <div className="flex items-end gap-2 h-36 mb-4">
+            {ranked.map((r, i) => {
+              const pct    = maxSold > 0 ? (r.sold / maxSold) * 100 : 0
+              const height = r.sold === 0 ? 8 : Math.max(14, pct)
+              return (
+                <button
+                  key={r.product.id}
+                  onClick={() => {}} // could open sheet in future
+                  className="flex-1 flex flex-col items-center gap-1.5 group"
+                  style={{ height: '100%', justifyContent: 'flex-end' }}
+                >
+                  {r.sold > 0 && (
+                    <span className="text-xs font-bold text-white tabular-nums">{r.sold}</span>
+                  )}
+                  <div
+                    className="w-full rounded-t-xl transition-all duration-500"
+                    style={{
+                      height: `${height}%`,
+                      backgroundColor: r.sold === 0 ? 'rgba(255,255,255,0.06)' : r.info.color,
+                      opacity: r.sold === 0 ? 1 : 0.9,
+                    }}
+                  />
+                </button>
+              )
+            })}
+          </div>
 
-      {/* Units remaining — the hero number */}
-      {isOut ? (
-        <p className="text-lg font-bold text-red-400 mb-0.5">Out of stock</p>
+          {/* Labels */}
+          <div className="flex gap-2">
+            {ranked.map((r, i) => (
+              <div key={r.product.id} className="flex-1 flex flex-col items-center gap-0.5">
+                <div className="w-2 h-2 rounded-full mx-auto" style={{ backgroundColor: r.info.color }} />
+                <span className="text-[9px] text-surface-500 text-center leading-tight">{r.info.name}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Ranked list below chart */}
+          <div className="mt-5 space-y-2 border-t border-surface-700 pt-4">
+            {ranked.filter(r => r.sold > 0).map((r, i) => (
+              <div key={r.product.id} className="flex items-center gap-3">
+                <span className="text-base w-6 flex-shrink-0">{MEDALS[i] ?? `#${i + 1}`}</span>
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.info.color }} />
+                <span className="text-sm text-white flex-1">{r.info.name} Edition</span>
+                <span className="text-sm font-bold text-surface-300 tabular-nums">{r.sold} sold</span>
+              </div>
+            ))}
+            {ranked.filter(r => r.sold === 0).length > 0 && (
+              <div className="flex items-center gap-3 opacity-40">
+                <span className="text-base w-6">—</span>
+                <span className="text-sm text-surface-500">
+                  {ranked.filter(r => r.sold === 0).map(r => r.info.name).join(', ')} · no sales yet
+                </span>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
-        <p className="text-3xl font-bold text-white tabular-nums leading-none mb-0.5">
-          {remaining.toLocaleString()}
-        </p>
+        /* Empty state — no sales recorded yet */
+        <div className="flex flex-col items-center py-6 gap-3">
+          <div className="flex items-end gap-2 h-24 opacity-20">
+            {ranked.map((r, i) => (
+              <div
+                key={r.product.id}
+                className="flex-1 rounded-t-xl"
+                style={{
+                  height: `${[60, 80, 45, 30, 55][i] ?? 50}%`,
+                  backgroundColor: r.info.color,
+                }}
+              />
+            ))}
+          </div>
+          <p className="text-sm text-surface-500">Record your first sale to see which edition leads.</p>
+          <Link href="/sales/new" className="text-xs text-gold font-medium">Record a sale →</Link>
+        </div>
       )}
-      {!isOut && (
-        <p className={`text-xs mb-3 ${isLow ? 'text-amber-400 font-medium' : 'text-surface-500'}`}>
-          {isLow ? 'Running low' : 'remaining'}
-        </p>
-      )}
-      {isOut && <p className="text-xs text-surface-500 mb-3">0 remaining</p>}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-surface-700">
-        <span className="text-xs text-surface-500">{unitsSold.toLocaleString()} sold</span>
-        <span className="text-xs font-medium text-surface-400 group-hover:text-gold transition-colors">
-          + Add stock
-        </span>
-      </div>
-    </button>
+    </div>
   )
 }
 
@@ -64,13 +115,13 @@ function StockCard({ product, unitsSold, onClick }: StockCardProps) {
 export default function DashboardPage() {
   const supabase = getSupabaseClient()
 
-  const [products, setProducts]           = useState<Product[]>([])
-  const [sales, setSales]                 = useState<Sale[]>([])
-  const [loading, setLoading]             = useState(true)
-  const [sheetProduct, setSheetProduct]   = useState<Product | null>(null)
-  const [addQty, setAddQty]               = useState('')
-  const [addBatch, setAddBatch]           = useState('')
-  const [addingSt, setAddingSt]           = useState(false)
+  const [products, setProducts]         = useState<Product[]>([])
+  const [sales, setSales]               = useState<Sale[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [sheetProduct, setSheetProduct] = useState<Product | null>(null)
+  const [addQty, setAddQty]             = useState('')
+  const [addBatch, setAddBatch]         = useState('')
+  const [addingSt, setAddingSt]         = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -97,13 +148,17 @@ export default function DashboardPage() {
   const revenueAllTime = sales.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
   const revenueMonth   = salesMonth.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
 
-  // units sold per product
+  // units sold per product — sorted descending
   const unitsSoldMap: Record<string, number> = {}
   for (const s of sales) {
     unitsSoldMap[s.product_id] = (unitsSoldMap[s.product_id] ?? 0) + s.quantity
   }
 
-  // low stock
+  const ranked: RankedEdition[] = [...products]
+    .map(p => ({ product: p, sold: unitsSoldMap[p.id] ?? 0, info: getEditionInfo(p.name) }))
+    .sort((a, b) => b.sold - a.sold)
+
+  // low / out stock
   const lowStock = products.filter(p => p.stock > 0 && p.stock <= p.reorder_level)
   const outStock = products.filter(p => p.stock <= 0)
 
@@ -150,9 +205,9 @@ export default function DashboardPage() {
 
   return (
     <AppLayout title="Dashboard" subtitle={today_label}>
-      <div className="space-y-6 max-w-2xl mx-auto lg:max-w-none">
+      <div className="space-y-4 max-w-2xl mx-auto lg:max-w-none">
 
-        {/* ── KPI — two numbers, nothing else ─────────── */}
+        {/* ── KPI — two numbers ───────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           <div className="card p-5">
             <p className="text-xs text-surface-500 mb-2">All-time revenue</p>
@@ -165,22 +220,30 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Low stock alert ──────────────────────────── */}
+        {/* ── Low stock alert ─────────────────────────── */}
         {(lowStock.length > 0 || outStock.length > 0) ? (
           <div className="bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4">
             <p className="text-xs font-semibold text-amber-400 uppercase tracking-widest mb-3">Low stock alert</p>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {[...outStock, ...lowStock].map(p => {
                 const info = getEditionInfo(p.name)
                 return (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }} />
-                      <span className="text-sm text-surface-300">{info.name} Edition</span>
+                  <div key={p.id} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
+                      <span className="text-sm text-surface-300 truncate">{info.name} Edition</span>
                     </div>
-                    <span className={`text-sm font-semibold ${p.stock <= 0 ? 'text-red-400' : 'text-amber-400'}`}>
-                      {p.stock <= 0 ? 'Out of stock' : `${p.stock} left`}
-                    </span>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className={`text-sm font-semibold ${p.stock <= 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                        {p.stock <= 0 ? 'Out of stock' : `${p.stock} left`}
+                      </span>
+                      <button
+                        onClick={() => openSheet(p)}
+                        className="text-xs text-gold font-semibold hover:underline"
+                      >
+                        + Add
+                      </button>
+                    </div>
                   </div>
                 )
               })}
@@ -188,25 +251,13 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="bg-surface-800/50 border border-surface-700 rounded-2xl px-4 py-3 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-edition-global" />
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#00bf63' }} />
             <p className="text-sm text-surface-400">All editions sufficiently stocked</p>
           </div>
         )}
 
-        {/* ── Stock cards (hero) ───────────────────────── */}
-        <div>
-          <p className="section-label mb-3">Stock levels — tap a card to add stock</p>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
-            {products.map(p => (
-              <StockCard
-                key={p.id}
-                product={p}
-                unitsSold={unitsSoldMap[p.id] ?? 0}
-                onClick={() => openSheet(p)}
-              />
-            ))}
-          </div>
-        </div>
+        {/* ── Edition ranking chart ───────────────────── */}
+        <EditionChart ranked={ranked} />
 
       </div>
 
@@ -215,7 +266,7 @@ export default function DashboardPage() {
         <Plus size={18} strokeWidth={2.5} /> New sale
       </Link>
 
-      {/* ── Add Stock bottom sheet ─────────────────────── */}
+      {/* ── Add stock bottom sheet ───────────────────── */}
       {sheetProduct && (() => {
         const info      = getEditionInfo(sheetProduct.name)
         const remaining = Math.max(0, sheetProduct.stock)
@@ -224,8 +275,6 @@ export default function DashboardPage() {
           <div className="sheet-overlay" onClick={closeSheet}>
             <div className="sheet-panel" onClick={e => e.stopPropagation()}>
               <div className="sheet-handle" />
-
-              {/* Header */}
               <div className="flex items-center gap-3 px-5 pt-4 pb-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: info.color }} />
                 <div className="flex-1">
@@ -234,7 +283,6 @@ export default function DashboardPage() {
                 </div>
                 <button onClick={closeSheet} className="btn-ghost p-1.5"><X size={18} /></button>
               </div>
-
               <form onSubmit={handleAddStock} className="px-5 pt-4 pb-8 space-y-4">
                 <div>
                   <label className="input-label">Quantity to add *</label>
