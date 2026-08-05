@@ -173,6 +173,11 @@ export default function DashboardPage() {
   const revenueAllTime = sales.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
   const revenueMonth   = salesMonth.reduce((sum, s) => sum + s.unit_price * s.quantity, 0)
 
+  // Earliest recorded sale — tells the owner when tracking began
+  const firstSaleDate = sales.length > 0
+    ? new Date(Math.min(...sales.map(s => new Date(s.sale_date).getTime())))
+    : null
+
   // units sold per product — sorted descending
   const unitsSoldMap: Record<string, number> = {}
   for (const s of sales) {
@@ -237,6 +242,11 @@ export default function DashboardPage() {
           <div className="card p-5">
             <p className="text-xs text-surface-500 mb-2">All-time revenue</p>
             <p className="text-2xl font-bold text-gold tabular-nums leading-none">{formatCurrency(revenueAllTime)}</p>
+            <p className="text-xs text-surface-500 mt-2">
+              {firstSaleDate
+                ? `Since ${firstSaleDate.toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                : 'No sales recorded yet'}
+            </p>
           </div>
           <div className="card p-5">
             <p className="text-xs text-surface-500 mb-2">This month</p>
