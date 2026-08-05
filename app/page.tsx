@@ -17,7 +17,7 @@ interface RankedEdition {
   info: ReturnType<typeof getEditionInfo>
 }
 
-function EditionChart({ ranked }: { ranked: RankedEdition[] }) {
+function EditionChart({ ranked, onAddStock }: { ranked: RankedEdition[]; onAddStock: (p: Product) => void }) {
   const maxSold  = Math.max(...ranked.map(r => r.sold), 1)
   const hasSales = ranked.some(r => r.sold > 0)
   const MEDALS   = ['🥇', '🥈', '🥉']
@@ -68,44 +68,69 @@ function EditionChart({ ranked }: { ranked: RankedEdition[] }) {
             ))}
           </div>
 
-          {/* Ranked list below chart */}
-          <div className="mt-5 space-y-2 border-t border-surface-700 pt-4">
-            {ranked.filter(r => r.sold > 0).map((r, i) => (
-              <div key={r.product.id} className="flex items-center gap-3">
-                <span className="text-base w-6 flex-shrink-0">{MEDALS[i] ?? `#${i + 1}`}</span>
+          {/* Ranked list — every edition, with stock + add action */}
+          <div className="mt-5 divide-y divide-surface-700 border-t border-surface-700">
+            {ranked.map((r, i) => (
+              <div key={r.product.id} className="flex items-center gap-3 py-2.5">
+                <span className="text-base w-6 flex-shrink-0 text-center">
+                  {r.sold > 0 ? (MEDALS[i] ?? `${i + 1}`) : '–'}
+                </span>
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.info.color }} />
-                <span className="text-sm text-white flex-1">{r.info.name} Edition</span>
-                <span className="text-sm font-bold text-surface-300 tabular-nums">{r.sold} sold</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{r.info.name} Edition</p>
+                  <p className="text-xs text-surface-500">
+                    {r.sold} sold · {Math.max(0, r.product.stock)} in stock
+                  </p>
+                </div>
+                <button
+                  onClick={() => onAddStock(r.product)}
+                  className="text-xs text-gold font-semibold hover:underline flex-shrink-0 px-2 py-1"
+                >
+                  + Stock
+                </button>
               </div>
             ))}
-            {ranked.filter(r => r.sold === 0).length > 0 && (
-              <div className="flex items-center gap-3 opacity-40">
-                <span className="text-base w-6">—</span>
-                <span className="text-sm text-surface-500">
-                  {ranked.filter(r => r.sold === 0).map(r => r.info.name).join(', ')} · no sales yet
-                </span>
-              </div>
-            )}
           </div>
         </>
       ) : (
         /* Empty state — no sales recorded yet */
-        <div className="flex flex-col items-center py-6 gap-3">
-          <div className="flex items-end gap-2 h-24 opacity-20">
-            {ranked.map((r, i) => (
-              <div
-                key={r.product.id}
-                className="flex-1 rounded-t-xl"
-                style={{
-                  height: `${[60, 80, 45, 30, 55][i] ?? 50}%`,
-                  backgroundColor: r.info.color,
-                }}
-              />
+        <>
+          <div className="flex flex-col items-center py-4 gap-3">
+            <div className="flex items-end gap-2 h-24 w-full opacity-20">
+              {ranked.map((r, i) => (
+                <div
+                  key={r.product.id}
+                  className="flex-1 rounded-t-xl"
+                  style={{
+                    height: `${[60, 80, 45, 30, 55][i] ?? 50}%`,
+                    backgroundColor: r.info.color,
+                  }}
+                />
+              ))}
+            </div>
+            <p className="text-sm text-surface-500">Record your first sale to see which edition leads.</p>
+            <Link href="/sales/new" className="text-xs text-gold font-medium">Record a sale →</Link>
+          </div>
+
+          {/* Still allow stock management */}
+          <div className="mt-3 divide-y divide-surface-700 border-t border-surface-700">
+            {ranked.map(r => (
+              <div key={r.product.id} className="flex items-center gap-3 py-2.5">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.info.color }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{r.info.name} Edition</p>
+                  <p className="text-xs text-surface-500">{Math.max(0, r.product.stock)} in stock</p>
+                </div>
+                <button
+                  onClick={() => onAddStock(r.product)}
+                  className="text-xs text-gold font-semibold hover:underline flex-shrink-0 px-2 py-1"
+                >
+                  + Stock
+                </button>
+              </div>
             ))}
           </div>
-          <p className="text-sm text-surface-500">Record your first sale to see which edition leads.</p>
-          <Link href="/sales/new" className="text-xs text-gold font-medium">Record a sale →</Link>
-        </div>
+        </>
       )}
     </div>
   )
@@ -257,7 +282,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── Edition ranking chart ───────────────────── */}
-        <EditionChart ranked={ranked} />
+        <EditionChart ranked={ranked} onAddStock={openSheet} />
 
       </div>
 
