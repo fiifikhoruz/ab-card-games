@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Check, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { formatCurrency, getShortName } from '@/lib/utils'
-import { PAYMENT_METHODS, PRODUCT_COLORS, getEditionColor } from '@/lib/types'
+import { PAYMENT_METHODS, getEditionInfo } from '@/lib/types'
 import type { PaymentMethod, Product } from '@/lib/types'
 import toast from 'react-hot-toast'
 
@@ -35,14 +35,8 @@ const STEP_LABEL: Record<Step, string> = {
   confirm:  'Confirm',
 }
 
-// ── Edition name helper ───────────────────────────────────
-const EDITION_SHORT: Record<string, string> = {
-  'SSG-001': 'Ghana',
-  'SSG-002': 'Global',
-  'SSG-003': 'Spicy',
-  'SSG-004': 'Complete',
-  'SSG-005': 'Christian',
-}
+// Edition name + colour are derived from the product NAME (never the SKU),
+// so the DB is the single source of truth and labels can't drift.
 
 // ── Main page ─────────────────────────────────────────────
 export default function NewSalePage() {
@@ -247,7 +241,7 @@ export default function NewSalePage() {
             <>
               {lines.map((line, i) => {
                 const product = products.find(p => p.id === line.productId)
-                const color   = product ? (PRODUCT_COLORS[product.sku] ?? '#a0a0a0') : '#a0a0a0'
+                const color   = product ? getEditionInfo(product.name).color : '#a0a0a0'
                 const tot     = lineTotal(line)
                 return (
                   <div key={i} className="card p-4 space-y-3">
@@ -268,9 +262,9 @@ export default function NewSalePage() {
                     {/* Edition picker */}
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {products.map(p => {
-                        const c      = PRODUCT_COLORS[p.sku] ?? '#a0a0a0'
+                        const c      = getEditionInfo(p.name).color
                         const isSelv = line.productId === p.id
-                        const name   = EDITION_SHORT[p.sku] ?? getShortName(p.name)
+                        const name   = getEditionInfo(p.name).name
                         return (
                           <button
                             key={p.id}
@@ -452,8 +446,8 @@ export default function NewSalePage() {
               <div className="card divide-y divide-surface-700 overflow-hidden">
                 {lines.map((line, i) => {
                   const p = products.find(pr => pr.id === line.productId)
-                  const color = p ? (PRODUCT_COLORS[p.sku] ?? '#a0a0a0') : '#a0a0a0'
-                  const name  = p ? (EDITION_SHORT[p.sku] ?? getShortName(p.name)) : 'Unknown'
+                  const color = p ? getEditionInfo(p.name).color : '#a0a0a0'
+                  const name  = p ? getEditionInfo(p.name).name  : 'Unknown'
                   const tot   = lineTotal(line)
                   return (
                     <div key={i} className="list-row">

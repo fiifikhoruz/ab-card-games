@@ -57,14 +57,9 @@ export const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: strin
   { value: 'card_pos',     label: 'Card / POS',    icon: '💳' },
 ]
 
-// ── Edition colors (keyed by SKU) ────────────────────────
-export const PRODUCT_COLORS: Record<string, string> = {
-  'SSG-001': '#ffd700',   // Ghana Edition   — gold
-  'SSG-002': '#00bf63',   // Global Edition  — green
-  'SSG-003': '#ff3131',   // Spicy Edition   — red
-  'SSG-004': '#e8e8e8',   // Complete Edition — white
-  'SSG-005': '#8c52ff',   // Christian Edition — purple
-}
+// NOTE: Edition colours and names are resolved from the product NAME via
+// getEditionInfo() below — never from the SKU. SKU→name assumptions drift
+// from the database and caused mislabelled editions previously.
 
 // Helper: get edition color by product name substring
 export function getEditionColor(productName: string): string {
