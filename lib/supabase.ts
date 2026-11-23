@@ -3,7 +3,22 @@ import { createBrowserClient } from '@supabase/ssr'
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {},
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+          const request = new Request(input, init)
+          const url = new URL(request.url)
+          const databaseOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin
+          if (typeof window !== 'undefined' && url.origin === databaseOrigin && url.pathname.startsWith('/rest/v1/')) {
+            const target = new URL(`/api/database${url.pathname}${url.search}`, window.location.origin)
+            return fetch(new Request(target, request))
+          }
+          return fetch(request)
+        },
+      },
+    }
   )
 }
 
