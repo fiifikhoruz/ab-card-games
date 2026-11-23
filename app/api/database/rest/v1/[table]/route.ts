@@ -26,11 +26,13 @@ async function proxy(request: Request, { params }: { params: { table: string } }
     if (value) headers.set(name, value)
   }
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20000)
   try {
     const upstream = await fetch(target, {
       method: request.method, headers, cache: 'no-store', redirect: 'error',
       body: request.method === 'POST' ? await request.text() : undefined,
-      signal: AbortSignal.timeout(20000),
+      signal: controller.signal,
     })
     const responseHeaders = new Headers({ 'Cache-Control': 'no-store' })
     for (const name of ['content-type', 'content-range', 'range-unit', 'preference-applied']) {
@@ -38,8 +40,11 @@ async function proxy(request: Request, { params }: { params: { table: string } }
       if (value) responseHeaders.set(name, value)
     }
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders })
-  } catch {
+  } catch (error) {
+    console.error('Database request failed:', error instanceof Error ? error.message : 'Unknown connection error')
     return Response.json({ message: 'The database connection is unavailable. Please try again.' }, { status: 503 })
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
