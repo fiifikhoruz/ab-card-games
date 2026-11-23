@@ -1,5 +1,5 @@
 // Use the same public key and caller token as the browser. RLS stays in force.
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const TABLES = new Set(['products', 'sales', 'customers', 'stock_additions'])
