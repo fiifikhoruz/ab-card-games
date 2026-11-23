@@ -81,3 +81,24 @@ test('browser routes database requests through the app and keeps tokens, bodies 
     await options.global.fetch('https://database.example.com/auth/v1/token')
   } finally { delete global.window }
 })
+
+test('health checks bypass cached database successes and report failures', async () => {
+  const healthSource = fs.readFileSync('app/api/ping/route.ts', 'utf8')
+  const healthCode = ts.transpileModule(healthSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
+  const healthModule = { exports: {} }
+  new Function('module', 'exports', 'require', healthCode)(healthModule, healthModule.exports, name => {
+    if (name === 'next/server') return require(name)
+    return { createClient: (url, key, options) => ({ from: () => ({ select: () => ({ limit: async () => {
+      global.fetch = async (input, init) => {
+        assert.equal(init.cache, 'no-store')
+        return Response.json([])
+      }
+      await options.global.fetch('https://database.example.com/rest/v1/products')
+      return { error: { message: 'Database unavailable' } }
+    } }) }) }) }
+  })
+  const response = await healthModule.exports.GET()
+  assert.equal(response.status, 503)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.equal((await response.json()).ok, false)
+})
