@@ -121,7 +121,7 @@ export function NewSaleForm({ guessGH = false }: { guessGH?: boolean }) {
 
   // ── Submit ────────────────────────────────────────────────
   async function handleSubmit() {
-    if (saving || lines.length === 0 || !lines.every(l => products.some(p => p.id === l.productId) && Number.isInteger(Number(l.quantity)) && Number(l.quantity) > 0 && Number.isFinite(Number(l.unitPrice)) && Number(l.unitPrice) > 0) || (amountPaid !== '' && (!Number.isFinite(Number(amountPaid)) || Number(amountPaid) < 0 || Number(amountPaid) > grandTotal))) return
+    if (saving || lines.length === 0 || !lines.every(l => products.some(p => p.id === l.productId) && Number.isInteger(Number(l.quantity)) && Number(l.quantity) > 0 && Number.isFinite(Number(l.unitPrice)) && Number(l.unitPrice) > 0) || (amountPaid !== '' && (!Number.isFinite(Number(amountPaid)) || Number(amountPaid) < 0 || (!guessGH && Number(amountPaid) > grandTotal)))) return
     setSaving(true)
     try {
       let customerId: string | null = null
@@ -198,6 +198,28 @@ export function NewSaleForm({ guessGH = false }: { guessGH?: boolean }) {
       <button className="btn-primary" onClick={() => router.push(guessGH ? '/guess-gh' : '/sales')}>Back to sales</button>
     </div>
   )
+
+  if (guessGH) {
+    const line = lines[0]
+    const received = amountPaid === '' ? grandTotal : Number(amountPaid)
+    return <main className="max-w-md mx-auto p-5 space-y-5">
+      <button className="btn-ghost" onClick={goBack}>‹ Guess GH sales</button>
+      <h1 className="text-2xl font-bold">New Guess GH sale</h1>
+      <form className="card p-5 space-y-4" onSubmit={e => { e.preventDefault(); handleSubmit() }}>
+        <label className="block">Number of sets<input className="input" type="number" min="1" step="1" required value={line.quantity} onChange={e => updateLine(0,'quantity',e.target.value)} /></label>
+        <p>{formatCurrency(Number(line.unitPrice))} per set · Sale value: {formatCurrency(grandTotal)}</p>
+        <label className="block">Total received for all sets (GH₵)<input className="input" type="number" inputMode="decimal" min="0" step="0.01" required value={amountPaid === '' ? String(grandTotal) : amountPaid} onFocus={e => e.target.select()} onChange={e => setAmountPaid(e.target.value)} /></label>
+        {received > grandTotal && <p>Extra received: {formatCurrency(received-grandTotal)}</p>}
+        {received < grandTotal && <p>Balance due: {formatCurrency(grandTotal-received)}</p>}
+        <label className="block">Payment method<select className="input" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}>{PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label>
+        <details><summary>Customer and sale date</summary><div className="space-y-3 pt-3">
+          <label className="block">Customer name (optional)<input className="input" value={customerName} onChange={e => setCustomerName(e.target.value)} /></label>
+          <label className="block">Phone (optional)<input className="input" type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></label>
+          <label className="block">Sale date<input className="input" type="date" required value={saleDate} onChange={e=>setSaleDate(e.target.value)} /></label>
+        </div></details>
+        <button type="submit" className="btn-primary w-full" disabled={saving}>{saving ? 'Saving…' : 'Record sale'}</button>
+      </form></main>
+  }
 
   const stepIdx  = currentStepIndex()
   const progress = ((stepIdx + 1) / STEPS.length) * 100

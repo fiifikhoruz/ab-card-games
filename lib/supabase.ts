@@ -7,13 +7,16 @@ export function createClient() {
     {
       cookies: {},
       global: {
-        fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           const request = new Request(input, init)
           const url = new URL(request.url)
           const databaseOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).origin
           if (typeof window !== 'undefined' && url.origin === databaseOrigin && url.pathname.startsWith('/rest/v1/')) {
             const target = new URL(`/api/database${url.pathname}${url.search}`, window.location.origin)
-            return fetch(new Request(target, request))
+            return fetch(new Request(target, {
+              method: request.method, headers: request.headers, signal: request.signal,
+              body: request.method === 'POST' ? await request.text() : undefined,
+            }))
           }
           return fetch(request)
         },

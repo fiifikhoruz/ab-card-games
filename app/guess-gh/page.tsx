@@ -16,7 +16,7 @@ export default function GuessGHPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [price, setPrice] = useState('200')
+  const [price, setPrice] = useState('250')
   const [stock, setStock] = useState('105')
   const [saving, setSaving] = useState(false)
   const [addingStock, setAddingStock] = useState(false)
@@ -117,6 +117,7 @@ export default function GuessGHPage() {
                 <div className="flex justify-between gap-3"><p className="font-bold text-white">{s.customer_name}</p><p className="font-bold text-gold">{formatCurrency(s.quantity * s.unit_price)}</p></div>
                 <p className="text-sm text-surface-400">{s.quantity} unit{s.quantity === 1 ? '' : 's'} · {formatDate(s.sale_date)}</p>
                 <p className="text-sm text-surface-400">{PAYMENT_METHODS.find(p => p.value === s.payment_method)?.label} · Paid {formatCurrency(Number(s.amount_paid))}</p>
+                {s.amount_paid > s.quantity * s.unit_price && <p className="text-sm">Received {formatCurrency(s.amount_paid)} · Extra {formatCurrency(s.amount_paid - s.quantity * s.unit_price)}</p>}
                 {s.quantity * s.unit_price > s.amount_paid && <p className="text-sm text-amber-400">Balance {formatCurrency(s.quantity * s.unit_price - s.amount_paid)}</p>}
               </div>)}
           </>}
